@@ -1,0 +1,310 @@
+#Arduino Code for Server for controlling Home Automation using Zigbee
+
+#include <SPI.h>
+#include <Ethernet.h>
+#include <SD.h>
+// size of buffer used to capture HTTP requests
+#define REQ_BUF_SZ 40
+// MAC address from Ethernet shield sticker under board
+byte mac[] = { 0x90, 0xA2, 0xDA, 0x00, 0x8F, 0x3E };
+IPAddress ip(192, 168, 0, 10); // IP address, may need to change depending on
+network
+EthernetServer server(80); // create a server at port 80
+File webFile,movieFile; // handle to files on SD card
+char HTTP_req[REQ_BUF_SZ] = {0}; // buffered HTTP request stored as null
+terminated string
+char req_index = 0; // index into HTTP_req buffer
+char movieChar;
+char R1L1[]="off";
+char R1L2[]="off";
+char R2L1[]="off";
+char R2L2[]="off";
+String movieString="";
+String temps="";
+char temp[50]={0};
+int start,ending;
+boolean showPage=false;
+void setup()
+{
+ // disable Ethernet chip
+ //pinMode(10, OUTPUT);
+ //digitalWrite(10, HIGH);
+
+ Serial.begin(38400); //open serial
+
+ // initialize SD card
+ Serial.println("Initializing SD card...");
+ if (!SD.begin(4)) {
+ Serial.println("ERROR - SD card initialization failed!");
+ setup();
+ // return; // init failed
+ }
+ Serial.println("SUCCESS - SD card initialized.");
+
+
+ // check for index.htm file
+ if (!SD.exists("mainMenu.htm")) {
+ Serial.println("ERROR - Can't find htm file!");
+ return; // can't find index file
+ }
+ Serial.println("SUCCESS - Found index.htm file.");
+ Ethernet.begin(mac, ip); // initialize Ethernet device
+ server.begin(); // start to listen for clients
+ SD.remove("movies.htm");
+ delay(1000);
+}
+void loop()
+{
+
+ EthernetClient client = server.available(); // try to get client
+ if (client) { // got client?
+ boolean currentLineIsBlank = true;
+ while (client.connected()) {
+ if (client.available()) { // client data available to read
+ char c = client.read(); // read 1 byte (character) from client
+ // buffer first part of HTTP request in HTTP_req array (string)
+ // leave last element in array as 0 to null terminate string (REQ_BUF_SZ -
+1)
+ if (req_index < (REQ_BUF_SZ - 1)) {
+ HTTP_req[req_index] = c; // save HTTP request character
+ req_index++;
+ }
+ // last line of client request is blank and ends with \n
+ // respond to client only after last line received
+ if (c == '\n' && currentLineIsBlank) {
+ // send a standard http response header
+ client.println("HTTP/1.1 200 OK");
+ client.println("Content-Type: text/html");
+ client.println("Connnection: close");
+ client.println();
+ if (StrContains(HTTP_req, "GET / ")
+ || StrContains(HTTP_req, "GET /mainMenu.htm")) {
+ webFile = SD.open("mainMenu.htm"); // open web page file
+ }
+ else if (StrContains(HTTP_req, "GET /R1E.htm")) {
+ rewritePage();
+ webFile = SD.open("R1E.htm"); // open web page file
+ }
+ else if (StrContains(HTTP_req, "GET /R2E.htm")) {
+ rewritePage();
+ webFile = SD.open("R2E.htm"); // open web page file
+ }
+ else if (StrContains(HTTP_req, "GET /R2M.htm")) {
+
+
+ Serial.println("R2M");
+ Serial.flush();
+ webFile = SD.open("R2M.htm"); // open web page file
+ }
+ else if (StrContains(HTTP_req, "GET /R1M.htm?R1M")) {
+ start+=13;ending+=2;
+ for(int i=start;i<=ending;i++)
+ temps+=HTTP_req[i];
+ Serial.println(temps);
+ temps="";
+ webFile = SD.open("mainMenu.htm"); // open web page file
+ }
+ else if (StrContains(HTTP_req, "GET /R1M.htm")) {
+ Serial.println("R1M");
+ webFile = SD.open("R1M.htm"); // open web page file
+ }
+ else if (StrContains(HTTP_req, "GET /Room1.htm")) {
+ webFile = SD.open("Room1.htm"); // open web page file
+ }
+ else if (StrContains(HTTP_req, "GET /Room2.htm")) {
+ webFile = SD.open("Room2.htm"); // open web page file
+ }
+ if (StrContains(HTTP_req, "GET /R1E.htm?R1L1=on"))
+ {
+ Serial.println("R1L1=on");
+ R1L1[0]='o';R1L1[1]='n';R1L1[2]=' ';
+ rewritePage();
+ webFile = SD.open("R1E.htm"); // open web page file
+ }
+ else if (StrContains(HTTP_req, "GET /R1E.htm?R1L2=on")) {
+ Serial.println("R1L2=on");
+ R1L2[0]='o';R1L2[1]='n';R1L2[2]=' ';
+ rewritePage();
+ webFile = SD.open("R1E.htm"); // open web page file
+ }
+ else if (StrContains(HTTP_req, "GET /R1E.htm?R1L1=off")) {
+ Serial.println("R1L1=off");
+ R1L1[0]='o';R1L1[1]='f';R1L1[2]='f';
+ rewritePage();
+ webFile = SD.open("R1E.htm"); // open web page file
+ }
+ else if (StrContains(HTTP_req, "GET /R1E.htm?R1L2=off")) {
+ Serial.println("R1L2=off");
+ R1L2[0]='o';R1L2[1]='f';R1L2[2]='f';
+ rewritePage();
+ webFile = SD.open("R1E.htm"); // open web page file
+ }
+ if (StrContains(HTTP_req, "GET /R2E.htm?R2L1=on"))
+ {
+ Serial.println("R2L1=on");
+
+
+ R2L1[0]='o';R2L1[1]='n';R2L1[2]=' ';
+ rewritePage();
+ webFile = SD.open("R2E.htm"); // open web page file
+ }
+ else if (StrContains(HTTP_req, "GET /R2E.htm?R2L2=on")) {
+ Serial.println("R2L2=on");
+ R2L2[0]='o';R2L2[1]='n';R2L2[2]=' ';
+ rewritePage();
+ webFile = SD.open("R2E.htm"); // open web page file
+ }
+ else if (StrContains(HTTP_req, "GET /R2E.htm?R2L1=off")) {
+ Serial.println("R2L1=off");
+ R2L1[0]='o';R2L1[1]='f';R2L1[2]='f';
+ rewritePage();
+ webFile = SD.open("R2E.htm"); // open web page file
+ }
+ else if (StrContains(HTTP_req, "GET /R2E.htm?R2L2=off")) {
+ Serial.println("R2L2=off");
+ R2L2[0]='o';R2L2[1]='f';R2L2[2]='f';
+ rewritePage();
+ webFile = SD.open("R2E.htm"); // open web page file
+ }
+
+ if (StrContains(HTTP_req, "GET /movies.htm HTTP/1.1")) {
+ SD.remove("movies.htm");
+ movieFile=SD.open("movies.htm",FILE_WRITE);
+ movieFile.println("<html>");
+ movieFile.write("<body>");
+ movieFile.close();
+ while(!showPage)
+ serialEvent();
+ webFile = SD.open("movies.htm"); // open web page file
+ }
+ else if (StrContains(HTTP_req, "GET /R2E.htm?R2L1D")) {
+ start+=13;ending+=3;
+ for(int i=start;i<=ending;i++)
+ temps+=HTTP_req[i];
+ Serial.println(temps);
+ temps="";
+ webFile = SD.open("R2E.htm"); // open web page file
+ }
+ // send web page to client
+ if (webFile) {
+ while(webFile.available()) {
+ client.write(webFile.read());
+ }
+ showPage=false;
+ webFile.close();
+ }
+ // reset buffer index and all buffer elements to 0
+
+
+ req_index = 0;
+ StrClear(HTTP_req, REQ_BUF_SZ);
+ break;
+ }
+ // every line of text received from the client ends with \r\n
+ if (c == '\n') {
+ // last character on line of received text
+ // starting new line with next character read
+ currentLineIsBlank = true;
+ }
+ else if (c != '\r') {
+ // a text character was received from client
+ currentLineIsBlank = false;
+ }
+ }
+ }
+ delay(1); // give the web browser time to receive the data
+ client.stop(); // close the connection
+ } // end if (client)
+}
+void rewritePage()
+{
+ webFile=SD.open("R1E.htm",FILE_WRITE);
+ webFile.seek(161);
+ webFile.print(R1L1);
+ webFile.seek(183);
+ webFile.print(R1L2);
+ webFile.close();
+ webFile=SD.open("R2E.htm",FILE_WRITE);
+ webFile.seek(161);
+ webFile.print(R2L1);
+ webFile.seek(183);
+ webFile.print(R2L2);
+ webFile.close();
+}
+void serialEvent() {
+ while (Serial.available()) {
+ // get the new byte:
+ movieChar = (char)Serial.read();
+ // add it to the inputString:
+ movieString+= movieChar;
+ // if the incoming character is a newline, set a flag
+ // so the main loop can do something about it:
+// Serial.print(movieString);
+ if (movieChar == '\n')
+ {
+ movieString.toCharArray(temp, 50);
+
+
+ if
+(StrContains(temp,"R1L1")||StrContains(temp,"R1L2")||StrContains(temp,"R2L1")||St
+rContains(temp,"R2L2"))
+ {movieString="";}
+ else if(StrContains(temp,"R1MEOF"))
+ {
+ movieFile=SD.open("movies.htm",FILE_WRITE);
+ movieFile.println("</body>");
+ movieFile.write("</html>");
+ movieFile.close();
+ showPage=true;
+ movieString="";
+ }
+ else
+ {
+ movieFile=SD.open("movies.htm",FILE_WRITE);
+ movieFile.print(movieString);
+ movieFile.write("<br>");
+ movieFile.close();
+ movieString="";
+ }
+ }
+ }
+ }
+// sets every element of str to 0 (clears array)
+void StrClear(char *str, char length)
+{
+ for (int i = 0; i < length; i++) {
+ str[i] = 0;
+ }
+}
+// searches for the string sfind in the string str
+// returns 1 if string found
+// returns 0 if string not found
+char StrContains(char *str, char *sfind)
+{
+ char found = 0;
+ char index = 0;
+ char len;
+ start=0;
+
+ len = strlen(str);
+
+ if (strlen(sfind) > len) {
+ return 0;
+ }
+
+ while (index < len) {
+ if (str[index] == sfind[found]) {
+ found++;
+ if (strlen(sfind) == found) {
+ ending=index;
+ return 1;
+ }
+ }
+ else {
+ found = 0;
+ start=index+1;
+ }
+ index++;
+ }
+ return 0;
+}
