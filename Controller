@@ -1,0 +1,70 @@
+Controller Code (Server sends Commands to this controller fitted in electrical equipments and controller takes actions based on servers commands)
+
+int L1=9;
+int L2=10;
+int index=0;
+char c;
+char incomingStr[15]={0};
+void setup()
+{
+ pinMode(L1,OUTPUT);
+ pinMode(L2,OUTPUT);
+ Serial.begin(38400);
+ Serial.println("Controller Started");
+}
+void loop()
+{
+ if(Serial.available()>0)
+ {
+ c=Serial.read();
+ Serial.print(c);
+ incomingStr[index]=c;
+ index++;
+ if (c=='\n')
+ {
+ if(StrContains(incomingStr,"R1L1=on"))
+ digitalWrite(L1,HIGH);
+ else if(StrContains(incomingStr,"R1L2=on"))
+ digitalWrite(L2,HIGH);
+ else if(StrContains(incomingStr,"R1L1=off"))
+ digitalWrite(L1,LOW);
+ else if(StrContains(incomingStr,"R1L2=off"))
+ digitalWrite(L2,LOW);
+ index = 0;
+ StrClear(incomingStr,15);
+ }}
+}
+void StrClear(char *str, char length)
+{
+ for (int i = 0; i < length; i++) {
+ str[i] = 0;
+ }
+
+}
+// searches for the string sfind in the string str
+// returns 1 if string found
+// returns 0 if string not found
+char StrContains(char *str, char *sfind)
+{
+ char found = 0;
+ char index = 0;
+ char len;
+ len = strlen(str);
+
+ if (strlen(sfind) > len) {
+ return 0;
+ }
+ while (index < len) {
+ if (str[index] == sfind[found]) {
+ found++;
+ if (strlen(sfind) == found) {
+ return 1;
+ }
+ }
+ else {
+ found = 0;
+ }
+ index++;
+ }
+ return 0;
+}
