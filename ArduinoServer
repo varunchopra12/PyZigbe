@@ -1,4 +1,5 @@
 #Arduino Code for Server for controlling Home Automation using Zigbee
+#Also Supports Selection of multimedia files using User Input and playing that file on Raspberry pi
 
 #include <SPI.h>
 #include <Ethernet.h>
